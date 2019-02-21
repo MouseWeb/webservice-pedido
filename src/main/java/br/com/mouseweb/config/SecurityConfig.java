@@ -23,6 +23,8 @@ import br.com.mouseweb.security.JWTAuthenticationFilter;
 import br.com.mouseweb.security.JWTAuthorizationFilter;
 import br.com.mouseweb.security.JWTUtil;
 
+ // Arquivo de configuração de segurança.
+
 @Configuration
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(prePostEnabled = true) 
@@ -48,7 +50,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 	};
 	
 	private static final String[] PUBLIC_MATCHERS_POST = {
-			"/clientes/**",
+			"/clientes",
+			"/clientes/picture",
 			"/auth/forgot/**"
 	};
 	
