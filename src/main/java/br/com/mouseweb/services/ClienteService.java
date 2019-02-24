@@ -32,44 +32,44 @@ import br.com.mouseweb.services.exceptions.ObjectNotFoundException;
 
 @Service
 public class ClienteService {
-	
+
 	@Autowired
 	private BCryptPasswordEncoder pe;
 
 	@Autowired
 	private ClienteRepository repo;
-	
+
 	@Autowired
 	private EnderecoRepository enderecoRepository;
-	
+
 	@Autowired
 	private S3Service s3Service;
-	
+
 	@Autowired
 	private ImageService imageService;
-	
+
 	// Pega o prefixo no arquivo (application.properties)
 	@Value("${img.prefix.client.profile}")
 	private String prefix;
-	
+
 	// Pega o tamanho da imagem no arquivo (application.properties)
 	@Value("${img.profile.size}")
 	private Integer size;
 
 	public Cliente find(Integer id) {
-		
-		// Verifica se o usuario logado é do perfil de admin e não for o cliente do id solicitado, lança uma Exceção. 
+
+		// Verifica se o usuario logado é do perfil de admin e não for o cliente do id
+		// solicitado, lança uma Exceção.
 		UserSS user = UserService.authenticated();
-		
+
 		if (user == null || !user.hasRole(Perfil.ADMIN) && !id.equals(user.getId())) {
 			throw new AuthorizationException("Acesso negado");
 		}
-		
+
 		Optional<Cliente> obj = repo.findById(id);
 		return obj.orElseThrow(() -> new ObjectNotFoundException(
 				"Objeto não encontrado! Id: " + id + ", Tipo: " + Cliente.class.getName()));
 	}
-	
 
 	@Transactional
 	public Cliente insert(Cliente obj) {
@@ -79,67 +79,88 @@ public class ClienteService {
 		return obj;
 
 	}
-	
+
 	public Cliente update(Cliente obj) {
 		Cliente newObj = find(obj.getId());
 		updateData(newObj, obj);
 		return repo.save(newObj);
 	}
-	
+
 	public void delete(Integer id) {
 		find(id);
 		try {
 			repo.deleteById(id);
-		}catch (DataIntegrityViolationException e) {
+		} catch (DataIntegrityViolationException e) {
 			throw new DataIntegrityException("Não é possível excluir por que há pedidos relacionadas");
 		}
-		
+
 	}
-	
+
 	public List<Cliente> findAll() {
 		return repo.findAll();
 	}
-	
+
+	// Endpoint para buscar cliente por email
+	public Cliente findByEmail(String email) {
+
+		// Verifica qual é o usuário que está autenticado
+		UserSS user = UserService.authenticated();
+		// Testa se o usuário é igual a null, igual a admin ou email não for igual a do user logado.
+		if (user == null || !user.hasRole(Perfil.ADMIN) && !email.equals(user.getUsername())) {
+			throw new AuthorizationException("Acesso negado");
+
+		}
+
+		Cliente obj = repo.findByEmail(email);
+		if (obj == null) {
+			throw new ObjectNotFoundException(
+					"Objeto não encontrado! Id: " + user.getId() + ", Tipo: " + Cliente.class.getName());
+		}
+
+		return obj;
+
+	}
+
 	// Paginação de categoria
 	public Page<Cliente> findPage(Integer page, Integer linesPerPage, String orderBy, String direction) {
-		PageRequest pageRequest = PageRequest.of(page, linesPerPage, Direction.valueOf(direction), orderBy); 
+		PageRequest pageRequest = PageRequest.of(page, linesPerPage, Direction.valueOf(direction), orderBy);
 		return repo.findAll(pageRequest);
 	}
-	
+
 	// Busca todos os clientes sem os dados
 	public Cliente fromDTO(ClienteDTO objDto) {
 		return new Cliente(objDto.getId(), objDto.getNome(), objDto.getEmail(), null, null, null);
 	}
-	
+
 	// Busca todos os clientes sem os dados, sobrecarga de método.
 	public Cliente fromDTO(ClienteNewDTO objDto) {
-		Cliente cli = new Cliente(null, objDto.getNome(), objDto.getEmail(), objDto.getCpfOuCnpj(), 
+		Cliente cli = new Cliente(null, objDto.getNome(), objDto.getEmail(), objDto.getCpfOuCnpj(),
 				TipoCliente.toEnum(objDto.getTipo()), pe.encode(objDto.getSenha()));
 		Cidade cid = new Cidade(objDto.getCidadeId(), null, null);
-		Endereco end = new Endereco(null, objDto.getLogradouro(), objDto.getNumero(), objDto.getComplemento(), 
-									objDto.getBairro(), objDto.getCep(), cli, cid);
-		
+		Endereco end = new Endereco(null, objDto.getLogradouro(), objDto.getNumero(), objDto.getComplemento(),
+				objDto.getBairro(), objDto.getCep(), cli, cid);
+
 		cli.getEnderecos().add(end);
 		cli.getTelefones().add(objDto.getTelefone1());
 
-		if (objDto.getTelefone2()!=null) {
+		if (objDto.getTelefone2() != null) {
 			cli.getTelefones().add(objDto.getTelefone2());
 		}
-		
-		if (objDto.getTelefone3()!=null) {
+
+		if (objDto.getTelefone3() != null) {
 			cli.getTelefones().add(objDto.getTelefone3());
 		}
-		
+
 		return cli;
-		
+
 	}
-	
+
 	// Pega os dados no banco e Faz update com novos dados da instaciação.
 	private void updateData(Cliente newObj, Cliente obj) {
 		newObj.setNome(obj.getNome());
 		newObj.setEmail(obj.getEmail());
 	}
-	
+
 	// Método para upload de imagem do perfil do cliente
 	// grava o Link da imagem do usuario que esta logado no banco de dados.
 	public URI uploadProfilePicture(MultipartFile multipartFile) {
@@ -147,28 +168,30 @@ public class ClienteService {
 		if (user == null) {
 			throw new AuthorizationException("Acesso negado");
 		}
-		
+
 		BufferedImage jpgImage = imageService.getJpgImageFromFile(multipartFile);
-		
+
 		// Recorta a imagem de forma que ela fique quadrada.
 		jpgImage = imageService.cropSquare(jpgImage);
-		// Eedimensionar o tamanho da imagem que está definido no (application.properties)
+		// Eedimensionar o tamanho da imagem que está definido no
+		// (application.properties)
 		jpgImage = imageService.resize(jpgImage, size);
-		
+
 		// monta o nome padrão do arquivo = prefix + cód do use + extensão JPG
 		String fileName = prefix + user.getId() + ".jpg";
-		
+
 		// Obj URI recebe a chamada do método UploadFile
-		URI uri =  s3Service.uploadFile(multipartFile);
-		
+		URI uri = s3Service.uploadFile(multipartFile);
+
 		return s3Service.uploadFile(imageService.getInputStream(jpgImage, "jpg"), fileName, "image");
-		
-		/*// Salva a URI = Link da imagem no banco de dados do cliente que esta logado.
-		Cliente cli = find(user.getId());
-		cli.setImageUrl(uri.toString());
-		repo.save(cli);
-		
-		return uri;*/
+
+		/*
+		 * // Salva a URI = Link da imagem no banco de dados do cliente que esta logado.
+		 * Cliente cli = find(user.getId()); cli.setImageUrl(uri.toString());
+		 * repo.save(cli);
+		 * 
+		 * return uri;
+		 */
 	}
 
 }
