@@ -128,8 +128,22 @@ public class ClienteService {
 	}
 	
 	// Método para upload de imagem do perfil do cliente
+	// grava o Link da imagem do usuario que esta logado no banco de dados.
 	public URI uploadProfilePicture(MultipartFile multipartFile) {
-		return s3Service.uploadFile(multipartFile);
+		UserSS user = UserService.authenticated();
+		if (user == null) {
+			throw new AuthorizationException("Acesso negado");
+		}
+		
+		// Obj URI recebe a chamada do método UploadFile
+		URI uri =  s3Service.uploadFile(multipartFile);
+		
+		// Salva a URI = Link da imagem no banco de dados do cliente que esta logado.
+		Cliente cli = find(user.getId());
+		cli.setImageUrl(uri.toString());
+		repo.save(cli);
+		
+		return uri;
 	}
 
 }
