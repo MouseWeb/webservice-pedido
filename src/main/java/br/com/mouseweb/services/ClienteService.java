@@ -48,8 +48,13 @@ public class ClienteService {
 	@Autowired
 	private ImageService imageService;
 	
+	// Pega o prefixo no arquivo (application.properties)
 	@Value("${img.prefix.client.profile}")
 	private String prefix;
+	
+	// Pega o tamanho da imagem no arquivo (application.properties)
+	@Value("${img.profile.size}")
+	private Integer size;
 
 	public Cliente find(Integer id) {
 		
@@ -144,6 +149,11 @@ public class ClienteService {
 		}
 		
 		BufferedImage jpgImage = imageService.getJpgImageFromFile(multipartFile);
+		
+		// Recorta a imagem de forma que ela fique quadrada.
+		jpgImage = imageService.cropSquare(jpgImage);
+		// Eedimensionar o tamanho da imagem que está definido no (application.properties)
+		jpgImage = imageService.resize(jpgImage, size);
 		
 		// monta o nome padrão do arquivo = prefix + cód do use + extensão JPG
 		String fileName = prefix + user.getId() + ".jpg";
