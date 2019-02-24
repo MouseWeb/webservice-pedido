@@ -59,7 +59,7 @@ public class Cliente implements Serializable{
 	private List<Pedido> pedidos = new ArrayList<>();
 	
 	// Var = quarda a URL da imagem do upload.
-	private String imageUrl;
+	//private String imageUrl;
 	
 	public Cliente() {
 		addPerfil(Perfil.CLIENTE);
@@ -157,13 +157,13 @@ public class Cliente implements Serializable{
 		this.pedidos = pedidos;
 	}
 	
-	public String getImageUrl() {
+	/*public String getImageUrl() {
 		return imageUrl;
 	}
 
 	public void setImageUrl(String imageUrl) {
 		this.imageUrl = imageUrl;
-	}
+	}*/
 
 	@Override
 	public int hashCode() {
